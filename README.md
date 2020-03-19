@@ -1,4 +1,6 @@
 # weartalk
+[![Go](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org)
+[![LICENSE](https://img.shields.io/badge/License-GNU%20Lesser%20General%20Public%20License%20v3.0-blue.svg)](LICENSE)
 weilei.weartalk and weilei.phonetalk APP's thrid party SDK.  
 **Warning: Don't use this project to develop any normal projects, it's only to have fun! Let's have fun!**  
 ## Intorduction
@@ -12,7 +14,7 @@ Wei Lei is a Chinese Android Developer(Maybe), he developed some useless and pro
 4. Checking password on client and send the true password to client.(Hahaha)  
 5. No data security measures.  
 6. It runs illegally in China.  
-### Let's have fun!
+## Let's have fun!
 ```bash
 go get github.com/AkinoMaple/weartalk
 ```
