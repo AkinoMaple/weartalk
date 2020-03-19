@@ -1,6 +1,6 @@
 # weartalk
 [![Go](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org)
-[![LICENSE](https://img.shields.io/badge/License-GNU%20Lesser%20General%20Public%20License%20v3.0-blue.svg)](LICENSE)
+[![LICENSE](https://img.shields.io/badge/License-GNU%20Lesser%20General%20Public%20License%20v3.0-blue.svg)](LICENSE)  
 weilei.weartalk and weilei.phonetalk APP's thrid party SDK.  
 **Warning: Don't use this project to develop any normal projects, it's only to have fun! Let's have fun!**  
 ## Intorduction
