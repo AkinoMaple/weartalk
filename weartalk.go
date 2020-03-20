@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/valyala/fasthttp"
 )
@@ -21,6 +24,14 @@ type Version struct {
 	Version string `json:"version"`
 	Tips    string `json:"tips"`
 	URL     string `json:"url"`
+}
+
+type UserInfo struct {
+	// shit English suki
+	Phone   []uint
+	Name    []string
+	email   string
+	message int
 }
 
 func (wt *WearTalk) getNickName() string {
@@ -66,20 +77,73 @@ func (wt *WearTalk) Get(url string, args *fasthttp.Args) ([]byte, error) {
 	return resp.Body(), err
 }
 
-func (wt *WearTalk) GetVersion() *Version {
+func (wt *WearTalk) GetVersion() (*Version, error) {
 	args := &fasthttp.Args{}
 	args.Add("ruanjian", "weartalk参数Ta")
 	resp, rErr := wt.Get("https://zhinengjiaju.vip/xczx/getversion.action", args)
 	if rErr != nil {
-		log.Printf("Get Version Request Error: %s", rErr)
-		return nil
+		log.Printf("Get Version Request Error: %s\n", rErr)
+		return nil, rErr
 	}
 
 	var ver Version
 	mErr := json.Unmarshal(resp, &ver)
 	if mErr != nil {
-		log.Printf("Unmarshal Version Data Error: %s", mErr)
+		log.Printf("Unmarshal Version Data Error: %s\n", mErr)
+		return nil, mErr
 	}
 
-	return &ver
+	return &ver, nil
+}
+
+func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map[string]string, error) {
+	var timestamp int64
+	if arguments != nil {
+		timestamp = arguments[0]
+	}
+
+	args := &fasthttp.Args{}
+	args.Add("roomid", roomid)
+	args.Add("uid", wt.getUID())
+	args.Add("words", message)
+	args.Add("nickname", wt.getNickName())
+	if timestamp == 0 {
+		timestamp = time.Now().Unix()
+	}
+	args.Add("timestamp", strconv.FormatInt(timestamp, 10))
+
+	if wt.Key == "" {
+		wt.Key = "fnakdjsgangaj65984qdvcvo71as1a3ds1g56a1g5a1ggagra&gajg15615avasggsa66a15g651a71ger1g5ar1g56ytiu7"
+	}
+	args.Add("key", wt.Key)
+
+	salt, sErr := wt.caclSalt(args)
+	if sErr != nil {
+		log.Printf("Calculate Salt Error: %s\n", sErr)
+		return nil, sErr
+	}
+	args.Add("salt", salt)
+
+	args.Del("key")
+
+	resp, rErr := wt.Get("http://zhinengjiaju.vip/xczx/saidwords.action", args)
+	if rErr != nil {
+		log.Printf("Send Request Error: %s\n", rErr)
+		return nil, rErr
+	}
+
+	status := make(map[string]string)
+	mErr := json.Unmarshal(resp, &status)
+	if mErr != nil {
+		log.Printf("Unmarshal Sended Status Data Error: %s\n", mErr)
+		return nil, mErr
+	}
+
+	return status, nil
+}
+
+func (wt *WearTalk) caclSalt(args *fasthttp.Args) (string, error) {
+	cipher := md5.New()
+	_, err := cipher.Write(args.QueryString())
+	return hex.EncodeToString(cipher.Sum(nil)), err
 }
