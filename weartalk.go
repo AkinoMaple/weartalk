@@ -1,4 +1,4 @@
-package main
+package weartalk
 
 import (
 	"crypto/md5"
