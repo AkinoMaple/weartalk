@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"strconv"
 	"time"
@@ -130,6 +131,10 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 	if rErr != nil {
 		log.Printf("Send Request Error: %s\n", rErr)
 		return nil, rErr
+	}
+
+	if resp == nil {
+		return nil, errors.New("Send Response is nil, Maybe IP was be blocked.")
 	}
 
 	status := make(map[string]string)
