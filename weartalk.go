@@ -13,7 +13,8 @@ import (
 )
 
 type WearTalk struct {
-	UID      int
+	UID      string //Ta/TaMP/TaMi + Int
+	ID       int    // Int ID
 	NickName string
 	Sex      int8
 	Key      string
@@ -31,16 +32,35 @@ type UserInfo struct {
 	// shit English suki
 	Phone   []uint
 	Name    []string
-	email   string
-	message int
+	Email   string
+	Message int
+}
+
+type Messages struct {
+	Time interface{} `json:"time"`
+	Room struct {
+		Firstman string `json:"fristman"`
+		Password string `json:"pwd"`
+		Talks    []Msg  `json:"talks"`
+		RoomID   string `json:"roomid"`
+	} `json:"room"`
+	Status string `json:"status"`
+}
+
+type Msg struct {
+	UID      string `json:"uid"`
+	IP       string `json:"ip"`
+	Words    string `json:"words"`
+	NickName string `json:"nickname"`
+	Time     int64  `json:"time"`
 }
 
 func (wt *WearTalk) getNickName() string {
 	switch wt.Sex {
-	case 0:
+	case 1:
 		return wt.NickName + "♂"
 
-	case 1:
+	case 2:
 		return wt.NickName + "♀"
 
 	default:
@@ -48,18 +68,18 @@ func (wt *WearTalk) getNickName() string {
 	}
 }
 
-func (wt *WearTalk) getUID() string {
+func (wt *WearTalk) MarshalUID() {
 	switch wt.Device {
-	case 0:
-		return "TaMi" + strconv.Itoa(wt.UID)
 	case 1:
-		return "TaMP" + strconv.Itoa(wt.UID)
+		wt.UID = "TaMi" + strconv.Itoa(wt.ID)
+	case 2:
+		wt.UID = "TaMP" + strconv.Itoa(wt.ID)
 	default:
-		return "Ta" + strconv.Itoa(wt.UID)
+		wt.UID = "Ta" + strconv.Itoa(wt.ID)
 	}
 }
 
-func (wt *WearTalk) Get(url string, args *fasthttp.Args) ([]byte, error) {
+func (wt *WearTalk) get(url string, args *fasthttp.Args) ([]byte, error) {
 	req := &fasthttp.Request{}
 	req.SetRequestURI(url + "?" + args.String())
 	req.Header.SetMethod("GET")
@@ -81,15 +101,14 @@ func (wt *WearTalk) Get(url string, args *fasthttp.Args) ([]byte, error) {
 func (wt *WearTalk) GetVersion() (*Version, error) {
 	args := &fasthttp.Args{}
 	args.Add("ruanjian", "weartalk参数Ta")
-	resp, rErr := wt.Get("https://zhinengjiaju.vip/xczx/getversion.action", args)
+	resp, rErr := wt.get("https://zhinengjiaju.vip/xczx/getversion.action", args)
 	if rErr != nil {
 		log.Printf("Get Version Request Error: %s\n", rErr)
 		return nil, rErr
 	}
 
 	var ver Version
-	mErr := json.Unmarshal(resp, &ver)
-	if mErr != nil {
+	if mErr := json.Unmarshal(resp, &ver); mErr != nil {
 		log.Printf("Unmarshal Version Data Error: %s\n", mErr)
 		return nil, mErr
 	}
@@ -105,7 +124,7 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 
 	args := &fasthttp.Args{}
 	args.Add("roomid", roomid)
-	args.Add("uid", wt.getUID())
+	args.Add("uid", wt.UID)
 	args.Add("words", message)
 	args.Add("nickname", wt.getNickName())
 	if timestamp == 0 {
@@ -127,7 +146,7 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 
 	args.Del("key")
 
-	resp, rErr := wt.Get("http://zhinengjiaju.vip/xczx/saidwords.action", args)
+	resp, rErr := wt.get("http://zhinengjiaju.vip/xczx/saidwords.action", args)
 	if rErr != nil {
 		log.Printf("Send Request Error: %s\n", rErr)
 		return nil, rErr
@@ -138,8 +157,7 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 	}
 
 	status := make(map[string]string)
-	mErr := json.Unmarshal(resp, &status)
-	if mErr != nil {
+	if mErr := json.Unmarshal(resp, &status); mErr != nil {
 		log.Printf("Unmarshal Sended Status Data Error: %s\n", mErr)
 		return nil, mErr
 	}
@@ -151,4 +169,30 @@ func (wt *WearTalk) caclSalt(args *fasthttp.Args) (string, error) {
 	cipher := md5.New()
 	_, err := cipher.Write(args.QueryString())
 	return hex.EncodeToString(cipher.Sum(nil)), err
+}
+
+func (wt *WearTalk) GetMessages(roomid string, timestamp int64) (*Messages, error) {
+	args := &fasthttp.Args{}
+	args.Add("roomid", roomid)
+	args.Add("timestamp", strconv.FormatInt(timestamp, 10))
+
+	resp, rErr := wt.get("https://zhinengjiaju.vip/xczx/gettalks.action", args)
+	if rErr != nil {
+		log.Printf("Get Messages Error: %s\n", rErr)
+		return nil, rErr
+	}
+
+	var msgs Messages
+	if mErr := json.Unmarshal(resp, &msgs); mErr != nil {
+		log.Printf("Get Messages Error: %s\n", mErr)
+		return nil, mErr
+	}
+
+	var fErr error
+	msgs.Time, fErr = strconv.Atoi(msgs.Time.(string))
+	if fErr != nil {
+		log.Printf("Time Atoi Error: %s\n", fErr)
+	}
+
+	return &msgs, nil
 }
