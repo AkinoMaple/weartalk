@@ -37,14 +37,16 @@ type UserInfo struct {
 }
 
 type Messages struct {
-	Time interface{} `json:"time"`
-	Room struct {
-		Firstman string `json:"fristman"`
-		Password string `json:"pwd"`
-		Talks    []Msg  `json:"talks"`
-		RoomID   string `json:"roomid"`
-	} `json:"room"`
-	Status string `json:"status"`
+	Time   interface{} `json:"time"`
+	Room   Room        `json:"room"`
+	Status interface{} `json:"status"`
+}
+
+type Room struct {
+	Firstman string      `json:"fristman"`
+	Password string      `json:"pwd"`
+	Talks    interface{} `json:"talks"`
+	RoomID   string      `json:"roomid"`
 }
 
 type Msg struct {
@@ -53,7 +55,11 @@ type Msg struct {
 	Words    string `json:"words"`
 	NickName string `json:"nickname"`
 	Time     int64  `json:"time"`
+	Avatar   string `json:"touxiangname"`
+	RoomID   string `json:"-"`
 }
+
+type CallBackFunc func(*Msg)
 
 func (wt *WearTalk) getNickName() string {
 	switch wt.Sex {
@@ -120,6 +126,8 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 	var timestamp int64
 	if arguments != nil {
 		timestamp = arguments[0]
+	} else {
+		timestamp = time.Now().UnixNano() / 1e6
 	}
 
 	args := &fasthttp.Args{}
@@ -127,9 +135,6 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 	args.Add("uid", wt.UID)
 	args.Add("words", message)
 	args.Add("nickname", wt.getNickName())
-	if timestamp == 0 {
-		timestamp = time.Now().Unix()
-	}
 	args.Add("timestamp", strconv.FormatInt(timestamp, 10))
 
 	if wt.Key == "" {
@@ -174,25 +179,73 @@ func (wt *WearTalk) caclSalt(args *fasthttp.Args) (string, error) {
 func (wt *WearTalk) GetMessages(roomid string, timestamp int64) (*Messages, error) {
 	args := &fasthttp.Args{}
 	args.Add("roomid", roomid)
-	args.Add("timestamp", strconv.FormatInt(timestamp, 10))
+	args.Add("time", strconv.FormatInt(timestamp, 10))
 
 	resp, rErr := wt.get("https://zhinengjiaju.vip/xczx/gettalks.action", args)
 	if rErr != nil {
 		log.Printf("Get Messages Error: %s\n", rErr)
 		return nil, rErr
 	}
+	var talksRaw json.RawMessage
+	msgs := Messages{
+		Room: Room{
+			Talks: &talksRaw,
+		},
+	}
 
-	var msgs Messages
 	if mErr := json.Unmarshal(resp, &msgs); mErr != nil {
-		log.Printf("Get Messages Error: %s\n", mErr)
+		log.Printf("Unmarshal Messages Error: %s\n", mErr)
 		return nil, mErr
 	}
 
-	var fErr error
-	msgs.Time, fErr = strconv.Atoi(msgs.Time.(string))
-	if fErr != nil {
-		log.Printf("Time Atoi Error: %s\n", fErr)
+	if msgs.Time != nil {
+		var fErr error
+		msgs.Time, fErr = strconv.Atoi(msgs.Time.(string))
+		if fErr != nil {
+			log.Printf("Time Atoi Error: %s\n", fErr)
+		}
+	}
+
+	switch msgs.Status.(string) {
+	case "null":
+		msgs.Status = 0
+	case "has news":
+		msgs.Status = 1
+	case "no news":
+		msgs.Status = 2
+	}
+
+	if msgs.Status.(int) == 1 {
+		var talks []Msg
+		if mErr := json.Unmarshal(talksRaw, &talks); mErr != nil {
+			log.Printf("Unmarshal Messages Error: %s\n", mErr)
+			return nil, mErr
+		}
+		msgs.Room.Talks = talks
 	}
 
 	return &msgs, nil
+}
+
+func (wt *WearTalk) HandleMsg(roomid string, callback CallBackFunc, arguments ...int64) {
+	var timestamp int64
+	if arguments != nil {
+		timestamp = arguments[0]
+	} else {
+		timestamp = time.Now().UnixNano() / 1e6
+	}
+
+	go func() {
+		for {
+			if msgs, mErr := wt.GetMessages(roomid, timestamp); mErr == nil && msgs.Status.(int) == 1 {
+				for _, msg := range msgs.Room.Talks.([]Msg) {
+					msg.RoomID = roomid
+					timestamp = time.Now().UnixNano() / 1e6
+					callback(&msg)
+				}
+			}
+
+		}
+	}()
+
 }
