@@ -228,14 +228,23 @@ func (wt *WearTalk) GetMessages(roomid string, timestamp int64) (*Messages, erro
 }
 
 func (wt *WearTalk) HandleMsg(roomid string, callback CallBackFunc, arguments ...int64) {
+	var tick int64
 	var timestamp int64
-	if arguments != nil {
-		timestamp = arguments[0]
+
+	if len(arguments) > 0 {
+		tick = arguments[0]
+	} else {
+		tick = 0
+	}
+
+	if len(arguments) > 1 {
+		timestamp = arguments[1]
 	} else {
 		timestamp = time.Now().UnixNano() / 1e6
 	}
 
 	go func() {
+		ticker := time.Tick(time.Second * time.Duration(tick))
 		for {
 			if msgs, mErr := wt.GetMessages(roomid, timestamp); mErr == nil && msgs.Status.(int) == 1 {
 				for _, msg := range msgs.Room.Talks.([]Msg) {
@@ -244,7 +253,7 @@ func (wt *WearTalk) HandleMsg(roomid string, callback CallBackFunc, arguments ..
 					callback(&msg)
 				}
 			}
-
+			<-ticker
 		}
 	}()
 
