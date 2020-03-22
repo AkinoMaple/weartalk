@@ -19,6 +19,7 @@ type WearTalk struct {
 	Sex      int8
 	Key      string
 	Device   int8
+	Avatar   string
 	XFF      string
 }
 
@@ -150,6 +151,7 @@ func (wt *WearTalk) Send(roomid string, message string, arguments ...int64) (map
 	args.Add("salt", salt)
 
 	args.Del("key")
+	args.Add("touxiangname", wt.Avatar)
 
 	resp, rErr := wt.get("http://zhinengjiaju.vip/xczx/saidwords.action", args)
 	if rErr != nil {
@@ -256,5 +258,29 @@ func (wt *WearTalk) HandleMsg(roomid string, callback CallBackFunc, arguments ..
 			<-ticker
 		}
 	}()
+
+}
+
+func (wt *WearTalk) GetIsVIP(uid string) (bool, error) {
+	args := &fasthttp.Args{}
+	args.Add("username", uid)
+
+	resp, rErr := wt.get("https://zhinengjiaju.vip/gpsfly0/getvip.action", args)
+	if rErr != nil {
+		log.Printf("Get VIP Status Error: %s\n", rErr)
+		return false, rErr
+	}
+
+	isvip := make(map[string]string)
+	if mErr := json.Unmarshal(resp, &isvip); mErr != nil {
+		log.Printf("Unmarshal Sended Status Data Error: %s\n", mErr)
+		return false, mErr
+	}
+
+	if isvip["isvip"] == "v" {
+		return true, nil
+	} else {
+		return false, nil
+	}
 
 }
